@@ -2,111 +2,123 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import os
 
-# Токен полностью удалён - bothost подставит автоматически
+# Токен берётся из переменных окружения (bothost / любой хостинг)
 bot = telebot.TeleBot(os.getenv('BOT_TOKEN') or os.getenv('TELEGRAM_TOKEN'))
 
-ADMIN_ID = 5841365763  # ← ЗАМЕНИТЕ НА ВАШ Telegram ID (узнайте @userinfobot)
+# ID админа (ТВОЙ Telegram ID). Узнать можно у @userinfobot
+ADMIN_ID = 123456789  # ← ОБЯЗАТЕЛЬНО замени на свой ID
 
-def send_with_logo(chat_id, text):
-    """Отправка с логотипом"""
+def send_with_logo(chat_id, text, reply_markup=None):
+    """Отправка текста с картинкой start.png"""
     try:
         with open('start.png', 'rb') as photo:
-            bot.send_photo(chat_id, photo, caption=text, parse_mode='HTML')
-    except:
-        bot.send_message(chat_id, text, parse_mode='HTML')
+            bot.send_photo(
+                chat_id,
+                photo,
+                caption=text,
+                reply_markup=reply_markup,
+                parse_mode='HTML'
+            )
+    except FileNotFoundError:
+        bot.send_message(chat_id, text, reply_markup=reply_markup, parse_mode='HTML')
+
+
+# ---------- ГЛАВНОЕ МЕНЮ ----------
+
+def main_menu_markup():
+    markup = InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        InlineKeyboardButton('🗣️ Получить консультацию', callback_data='consult'),
+        InlineKeyboardButton('💡 Советы для покупок', callback_data='tips'),
+        InlineKeyboardButton('⚖️ Правила FunPay', callback_data='rules')
+    )
+    return markup
 
 @bot.message_handler(commands=['start'])
 def start_handler(message):
+    text = (
+        "🔥 <b>FunPay Support Bot</b> 🔥\n\n"
+        "Привет! 👋\n"
+        "Здесь ты можешь получить помощь по возврату денег, спорам с продавцами "
+        "и безопасности покупок на FunPay.\n\n"
+        "Выбери нужный раздел ниже 👇"
+    )
+    send_with_logo(message.chat.id, text, reply_markup=main_menu_markup())
+
+
+# ---------- CALLBACK-КНОПКИ МЕНЮ ----------
+
+@bot.callback_query_handler(func=lambda call: call.data == 'consult')
+def cb_consult(call):
+    bot.answer_callback_query(call.id)
+    text = (
+        "🗣️ <b>Получить консультацию</b>\n\n"
+        "Опиши свою ситуацию одним сообщением:\n"
+        "• Номер заказа на FunPay\n"
+        "• Ник продавца\n"
+        "• В чём проблема\n\n"
+        "После этого я передам твоё обращение оператору. "
+        "Ты можешь вести несколько диалогов, просто пиши из того же чата."
+    )
+    send_with_logo(call.message.chat.id, text)
+
+@bot.callback_query_handler(func=lambda call: call.data == 'tips')
+def cb_tips(call):
+    bot.answer_callback_query(call.id)
+    text = (
+        "💡 <b>Советы для безопасных покупок на FunPay</b>\n\n"
+        "✅ Проверяй рейтинг и количество отзывов продавца.\n"
+        "✅ Внимательно читай описание товара и условия доставки.\n"
+        "✅ Не подтверждай выполнение заказа, пока товар реально не получен.\n"
+        "✅ Веди общение только в чате FunPay.\n\n"
+        "🚫 <b>НЕЛЬЗЯ:</b>\n"
+        "• Обмениваться контактами (Telegram, Discord и т.п.)\n"
+        "• Получать/отправлять оплату вне FunPay\n"
+        "• Вестись на слишком «выгодные» предложения."
+    )
+    send_with_logo(call.message.chat.id, text)
+
+@bot.callback_query_handler(func=lambda call: call.data == 'rules')
+def cb_rules(call):
+    bot.answer_callback_query(call.id)
     markup = InlineKeyboardMarkup(row_width=1)
     markup.add(
-        InlineKeyboardButton('🗣️ Консультация', callback_data='consult'),
-        InlineKeyboardButton('💡 Советы', callback_data='tips'),
-        InlineKeyboardButton('⚖️ Правила', callback_data='rules')
+        InlineKeyboardButton('📋 Общие правила', callback_data='rules1'),
+        InlineKeyboardButton('🏪 Правила для продавцов', callback_data='rules2'),
+        InlineKeyboardButton('⚖️ Ответственность продавцов', callback_data='rules3'),
+        InlineKeyboardButton('🔙 Назад в меню', callback_data='back_to_menu')
     )
-    text = "🔥 <b>FunPay Support Bot</b> 🔥\n\nПривет! Помощь по возвратам и спорам на FunPay!"
-    send_with_logo(message.chat.id, text)
-
-@bot.message_handler(func=lambda message: True)
-def handle_consultation(message):
-    """Все сообщения после /start = консультация"""
-    if message.text.startswith('/'):
-        return
-        
-    # ✅ РЕАЛ-ТАЙМ: сразу отправляем ВАМ сообщение + ID клиента
-    client_name = message.from_user.first_name or "Клиент"
-    forward_text = (
-        f"👤 <b>Новая консультация #{message.chat.id}</b>\n"
-        f"Имя: {client_name} (@{message.from_user.username or 'нет'})\n"
-        f"⏰ {message.date}\n\n"
-        f"💬 <b>Сообщение:</b>\n{message.text}\n\n"
-        f"📱 Ответить: /reply_{message.chat.id} текст"
+    text = (
+        "⚖️ <b>Краткие правила FunPay</b>\n\n"
+        "Выбери раздел, чтобы посмотреть основные пункты:\n"
+        "• Общие правила общения и поведения\n"
+        "• Что запрещено продавцам\n"
+        "• В каких случаях продавец возвращает деньги"
     )
-    
-    # Отправляем админу с кнопками быстрого ответа
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton('✅ Закрыто', callback_data=f'close_{message.chat.id}'))
-    markup.add(InlineKeyboardButton('💰 Возврат 100%', callback_data=f'refund_{message.chat.id}'))
-    markup.add(InlineKeyboardButton('⚠️ Жалоба', callback_data=f'claim_{message.chat.id}'))
-    
-    bot.send_photo(
-        ADMIN_ID, 
-        open('start.png', 'rb'), 
-        caption=forward_text,
-        reply_markup=markup,
-        parse_mode='HTML'
-    )
-    
-    # Подтверждение клиенту
-    send_with_logo(message.chat.id, 
-        f"✅ Ваше сообщение получено!\n"
-        f"🕐 Ожидайте ответа в течение 10 минут\n"
-        f"ID консультации: <code>{message.chat.id}</code>")
+    send_with_logo(call.message.chat.id, text, reply_markup=markup)
 
-# Быстрые ответы админа
-@bot.message_handler(func=lambda m: m.text.startswith('/reply_'))
-def admin_reply(message):
-    if message.from_user.id != ADMIN_ID:
-        return
-        
-    parts = message.text.split('_', 2)
-    if len(parts) < 3:
-        return
-        
-    client_id = int(parts[1])
-    reply_text = parts[2]
-    
-    bot.send_message(client_id, f"👨‍💼 <b>Ответ поддержки:</b>\n\n{reply_text}", parse_mode='HTML')
-
-@bot.callback_query_handler(func=lambda call: call.data.startswith(('close_', 'refund_', 'claim_')))
-def admin_actions(call):
-    if call.from_user.id != ADMIN_ID:
-        return
-        
-    action, client_id = call.data.split('_', 1)
-    client_id = int(client_id)
-    
-    if action == 'close':
-        bot.send_message(client_id, "✅ <b>Консультация закрыта!</b>\nСпасибо за обращение!", parse_mode='HTML')
-    elif action == 'refund':
-        bot.send_message(client_id, "💰 <b>Возврат одобрен 100%!</b>\nИнструкция: funpay.com/support", parse_mode='HTML')
-    elif action == 'claim':
-        bot.send_message(client_id, "⚠️ <b>Жалоба принята</b>\n📝 Подробности в личном кабинете FunPay", parse_mode='HTML')
-    
-    bot.answer_callback_query(call.id, "Отправлено клиенту!")
-    bot.edit_message_caption(
-        chat_id=call.message.chat.id,
-        message_id=call.message.message_id,
-        caption=call.message.caption + f"\n\n✅ <b>Действие выполнено</b>",
-        parse_mode='HTML'
-    )
-
-# Остальные колбэки (советы, правила) - как раньше
-@bot.callback_query_handler(func=lambda call: call.data in ['tips', 'rules', 'rules1', 'rules2', 'rules3'])
-def other_callbacks(call):
+@bot.callback_query_handler(func=lambda call: call.data == 'rules1')
+def cb_rules1(call):
     bot.answer_callback_query(call.id)
-    # ... (код советов и правил из предыдущей версии)
-    # Сокращаю для краткости - скопируйте из прошлого кода
+    text = (
+        "📋 <b>Общие правила FunPay (кратко)</b>\n\n"
+        "1️⃣ Запрещён обмен любыми контактами (Telegram, Discord, ВК, телефон и т.д.).\n"
+        "2️⃣ Нельзя заниматься спамом, флудом, накруткой отзывов, шантажом.\n"
+        "3️⃣ Запрещены оскорбления, угрозы, политические и токсичные обсуждения.\n"
+        "4️⃣ Нельзя раскрывать чужие личные данные и информацию о сделках.\n"
+        "5️⃣ Мошенничество и обман ведут к полной блокировке и отказу в выплатах.\n\n"
+        "Полный текст правил смотри на сайте FunPay."
+    )
+    send_with_logo(call.message.chat.id, text)
 
-if __name__ == '__main__':
-    print("🚀 FunPay Support Bot запущен!")
-    bot.polling(none_stop=True)
+@bot.callback_query_handler(func=lambda call: call.data == 'rules2')
+def cb_rules2(call):
+    bot.answer_callback_query(call.id)
+    text = (
+        "🏪 <b>Правила для продавцов (кратко)</b>\n\n"
+        "❌ Запрещено:\n"
+        "• Передавать товар без оплаты через FunPay.\n"
+        "• Просить подтвердить заказ до его фактического выполнения.\n"
+        "• Игнорировать вопросы покупателей.\n"
+        "• Выставлять фейковые предложения или неверные цены.\n"
+        "• Продавать запрещённые категории (аккаунты со
